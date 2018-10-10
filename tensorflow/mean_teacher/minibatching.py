@@ -24,11 +24,20 @@ def evaluation_epoch_generator(data, batch_size=100):
 def evaluation_epoch_generator_transform(data, transform, batch_size=100):
     def generate():
         for idx in range(0, len(data), batch_size):
-            transformed_batch = []
+            transformed_batch = np.zeros(batch_size, dtype=[
+                ('x', np.float32, (64, 64, 3)),
+                ('y', np.int32, ())  # We will be using -1 for unlabeled
+            ])
+
+            x_data, y_data = [], []
             for d in data[idx:(idx + batch_size)]:
                 iname, label = d
                 image = transform(iname)
-                transformed_batch.append((image, label))
+                x_data.append(image)
+                y_data.append(label)
+
+            transformed_batch['x'] = x_data
+            transformed_batch['y'] = y_data
             yield transformed_batch
     return generate
 
@@ -67,11 +76,21 @@ def eternal_batches(data, batch_size=100, random=np.random):
 def eternal_batches_transform(data, transform, batch_size=100, random=np.random):
     assert batch_size > 0 and len(data) > 0
     for batch_idxs in eternal_random_index_batches(len(data), batch_size, random):
-        transformed_batch = []
+        transformed_batch = np.zeros(len(batch_idxs), dtype=[
+            ('x', np.float32, (64, 64, 3)),
+            ('y', np.int32, ())  # We will be using -1 for unlabeled
+        ])
+
+        x_data, y_data = [], []
         for d in data[batch_idxs]:
             iname, label = d
             image = transform(iname)
-            transformed_batch.append((image, label))
+            x_data.append(image)
+            y_data.append(label)
+
+        transformed_batch['x'] = x_data
+        transformed_batch['y'] = y_data
+
         yield transformed_batch
 
 

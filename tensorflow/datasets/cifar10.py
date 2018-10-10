@@ -68,7 +68,6 @@ class Eye24:
         max_str_len = 0
         for line in open(filename, 'r'):
             iname, label = line.rstrip('\n').split(' ')
-            iname, label = line.rstrip('\n').split(' ')
             iname = self.imgs_dir + iname
             x_data.append(iname)
             y_data.append(int(label))
