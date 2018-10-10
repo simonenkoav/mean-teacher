@@ -54,3 +54,36 @@ class Cifar10ZCA:
             data, n_labeled, labels=data['y'], random=random)
         unlabeled['y'] = self.UNLABELED
         return np.concatenate([labeled, unlabeled])
+
+
+class Eye24:
+
+    def __init__(self, imgs_dir, train_filename, test_filename):
+        self.imgs_dir = imgs_dir
+
+        self._load(train_filename, test_filename)
+
+    def _load_data(self, filename):
+        x_data, y_data = [], []
+        max_str_len = 0
+        for line in open(filename, 'r'):
+            iname, label = line.rstrip('\n').split(' ')
+            iname, label = line.rstrip('\n').split(' ')
+            iname = self.imgs_dir + iname
+            x_data.append(iname)
+            y_data.append(int(label))
+
+            if len(iname) > max_str_len:
+                max_str_len = len(iname)
+
+        array = np.zeros(len(x_data), dtype=[
+            ('x', np.str, max_str_len),
+            ('y', np.int32, ())  # We will be using -1 for unlabeled
+        ])
+        array['x'] = x_data
+        array['y'] = y_data
+        return array
+
+    def _load(self, train_filename, test_filename):
+        self.training = self._load_data(train_filename)
+        self.evaluation = self._load_data(test_filename)

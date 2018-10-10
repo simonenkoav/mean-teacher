@@ -76,7 +76,7 @@ class Model:
             self.tensorboard_path = os.path.join(run_context.result_dir, 'tensorboard')
 
         with tf.name_scope("placeholders"):
-            self.images = tf.placeholder(dtype=tf.float32, shape=(None, 32, 32, 3), name='images')
+            self.images = tf.placeholder(dtype=tf.float32, shape=(None, 64, 64, 3), name='images')
             self.labels = tf.placeholder(dtype=tf.int32, shape=(None,), name='labels')
             self.is_training = tf.placeholder(dtype=tf.bool, shape=(), name='is_training')
 
@@ -384,7 +384,7 @@ def tower(inputs,
         slim.arg_scope(training_mode_funcs, **training_args):
             #pylint: disable=no-value-for-parameter
             net = inputs
-            assert_shape(net, [None, 32, 32, 3])
+            assert_shape(net, [None, 64, 64, 3])
 
             net = tf.cond(normalize_input,
                           lambda: slim.layer_norm(net,
@@ -392,7 +392,7 @@ def tower(inputs,
                                                   center=False,
                                                   scope='normalize_inputs'),
                           lambda: net)
-            assert_shape(net, [None, 32, 32, 3])
+            assert_shape(net, [None, 64, 64, 3])
 
             net = nn.flip_randomly(net,
                                    horizontally=flip_horizontally,
@@ -427,8 +427,8 @@ def tower(inputs,
             net = slim.flatten(net)
             assert_shape(net, [None, 128])
 
-            primary_logits = wn.fully_connected(net, 10, init=is_initialization)
-            secondary_logits = wn.fully_connected(net, 10, init=is_initialization)
+            primary_logits = wn.fully_connected(net, 24, init=is_initialization)
+            secondary_logits = wn.fully_connected(net, 24, init=is_initialization)
 
             with tf.control_dependencies([tf.assert_greater_equal(num_logits, 1),
                                           tf.assert_less_equal(num_logits, 2)]):
@@ -437,8 +437,8 @@ def tower(inputs,
                     (tf.equal(num_logits, 2), lambda: secondary_logits),
                 ], exclusive=True, default=lambda: primary_logits)
 
-            assert_shape(primary_logits, [None, 10])
-            assert_shape(secondary_logits, [None, 10])
+            assert_shape(primary_logits, [None, 24])
+            assert_shape(secondary_logits, [None, 24])
             return primary_logits, secondary_logits
 
 

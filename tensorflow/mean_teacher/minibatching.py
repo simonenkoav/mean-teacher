@@ -10,6 +10,10 @@ from itertools import islice, chain
 import numpy as np
 
 
+def training_batches_transform(data, transform, batch_size=100, random=np.random):
+    return eternal_batches_transform(data, transform, batch_size, random)
+
+
 def evaluation_epoch_generator(data, batch_size=100):
     def generate():
         for idx in range(0, len(data), batch_size):
@@ -46,6 +50,12 @@ def eternal_batches(data, batch_size=100, random=np.random):
     assert batch_size > 0 and len(data) > 0
     for batch_idxs in eternal_random_index_batches(len(data), batch_size, random):
         yield data[batch_idxs]
+
+
+def eternal_batches_transform(data, transform, batch_size=100, random=np.random):
+    assert batch_size > 0 and len(data) > 0
+    for batch_idxs in eternal_random_index_batches(len(data), batch_size, random):
+        yield transform(data[batch_idxs])
 
 
 def unlabel_batches(batch_generator):
