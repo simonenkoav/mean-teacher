@@ -79,7 +79,7 @@ def run(data_seed, model_type):
     model['training_length'] = 200000
 
     training_batches = minibatching.training_batches_transform(eye_dataset.training, train_pipeline, minibatch_size)
-    evaluation_batches_fn = minibatching.evaluation_epoch_generator(eye_dataset.evaluation, eval_pipeline,
+    evaluation_batches_fn = minibatching.evaluation_epoch_generator_transform(eye_dataset.evaluation, eval_pipeline,
                                                                     minibatch_size)
 
     tensorboard_dir = model.save_tensorboard_graph()

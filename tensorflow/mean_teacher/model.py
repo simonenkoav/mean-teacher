@@ -408,24 +408,24 @@ def tower(inputs,
             net = wn.conv2d(net, 128, scope="conv_1_3")
             net = slim.max_pool2d(net, [2, 2], scope='max_pool_1')
             net = slim.dropout(net, 1 - dropout_probability, scope='dropout_probability_1')
-            assert_shape(net, [None, 16, 16, 128])
+            # assert_shape(net, [None, 16, 16, 128])
 
             net = wn.conv2d(net, 256, scope="conv_2_1")
             net = wn.conv2d(net, 256, scope="conv_2_2")
             net = wn.conv2d(net, 256, scope="conv_2_3")
             net = slim.max_pool2d(net, [2, 2], scope='max_pool_2')
             net = slim.dropout(net, 1 - dropout_probability, scope='dropout_probability_2')
-            assert_shape(net, [None, 8, 8, 256])
+            # assert_shape(net, [None, 8, 8, 256])
 
             net = wn.conv2d(net, 512, padding='VALID', scope="conv_3_1")
-            assert_shape(net, [None, 6, 6, 512])
+            # assert_shape(net, [None, 6, 6, 512])
             net = wn.conv2d(net, 256, kernel_size=[1, 1], scope="conv_3_2")
             net = wn.conv2d(net, 128, kernel_size=[1, 1], scope="conv_3_3")
             net = slim.avg_pool2d(net, [6, 6], scope='avg_pool')
-            assert_shape(net, [None, 1, 1, 128])
+            # assert_shape(net, [None, 1, 1, 128])
 
             net = slim.flatten(net)
-            assert_shape(net, [None, 128])
+            # assert_shape(net, [None, 128])
 
             primary_logits = wn.fully_connected(net, 24, init=is_initialization)
             secondary_logits = wn.fully_connected(net, 24, init=is_initialization)
@@ -512,7 +512,7 @@ def consistency_costs(logits1, logits2, cons_coefficient, mask, consistency_trus
     """
 
     with tf.name_scope(name, "consistency_costs") as scope:
-        num_classes = 10
+        num_classes = 24
         assert_shape(logits1, [None, num_classes])
         assert_shape(logits2, [None, num_classes])
         assert_shape(cons_coefficient, [])

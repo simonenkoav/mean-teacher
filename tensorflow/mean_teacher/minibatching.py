@@ -21,6 +21,18 @@ def evaluation_epoch_generator(data, batch_size=100):
     return generate
 
 
+def evaluation_epoch_generator_transform(data, transform, batch_size=100):
+    def generate():
+        for idx in range(0, len(data), batch_size):
+            transformed_batch = []
+            for d in data[idx:(idx + batch_size)]:
+                iname, label = d
+                image = transform(iname)
+                transformed_batch.append((image, label))
+            yield transformed_batch
+    return generate
+
+
 def training_batches(data, batch_size=100, n_labeled_per_batch='vary', random=np.random):
     if n_labeled_per_batch == 'vary':
         return eternal_batches(data, batch_size, random)
@@ -55,7 +67,12 @@ def eternal_batches(data, batch_size=100, random=np.random):
 def eternal_batches_transform(data, transform, batch_size=100, random=np.random):
     assert batch_size > 0 and len(data) > 0
     for batch_idxs in eternal_random_index_batches(len(data), batch_size, random):
-        yield transform(data[batch_idxs])
+        transformed_batch = []
+        for d in data[batch_idxs]:
+            iname, label = d
+            image = transform(iname)
+            transformed_batch.append((image, label))
+        yield transformed_batch
 
 
 def unlabel_batches(batch_generator):
