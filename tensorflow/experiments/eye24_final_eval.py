@@ -55,7 +55,7 @@ def model_hyperparameters(model_type, n_labeled, n_all):
 
 
 def run(data_seed, model_type):
-    minibatch_size = 80
+    minibatch_size = 100
     # fixed and pre-calculated (from file)
     n_labeled = 27360
     n_all = 477360
