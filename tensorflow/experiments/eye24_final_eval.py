@@ -55,7 +55,7 @@ def model_hyperparameters(model_type, n_labeled, n_all):
 
 
 def run(data_seed, model_type):
-    minibatch_size = 100
+    minibatch_size = 80
     # fixed and pre-calculated (from file)
     n_labeled = 27360
     n_all = 477360
@@ -64,8 +64,8 @@ def run(data_seed, model_type):
     tf.reset_default_graph()
     model = Model(RunContext(__file__, data_seed))
 
-    train_filename = '/root/storage/hdd/eyes_color/descriptions_files/train_labeled_unlabeled_450k_rebalanced.txt'
-    test_filename = '/root/storage/hdd/eyes_color/test_rotated.txt'
+    train_filename = '/root/storage/hdd/eyes_color/descriptions_files/labeled_unlabeled_vgg_35k.txt'
+    test_filename = '/root/storage/hdd/eyes_color/descriptions_files/test_base_path.txt'
     eye_dataset = Eye24(imgs_dir='/root/storage/hdd/', train_filename=train_filename, test_filename=test_filename)
 
     model['flip_horizontally'] = True
@@ -74,7 +74,7 @@ def run(data_seed, model_type):
     model['apply_consistency_to_labeled'] = hyperparams['apply_consistency_to_labeled']
     model['adam_beta_2_during_rampup'] = 0.999
     model['ema_decay_during_rampup'] = 0.999
-    model['normalize_input'] = True  # Keep ZCA information # TODO not sure
+    model['normalize_input'] = False  # Keep ZCA information # TODO not sure
     model['rampdown_length'] = 25000
     model['training_length'] = 200000
 

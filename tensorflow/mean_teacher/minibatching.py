@@ -24,8 +24,11 @@ def evaluation_epoch_generator(data, batch_size=100):
 def evaluation_epoch_generator_transform(data, transform, batch_size=100):
     def generate():
         for idx in range(0, len(data), batch_size):
-            transformed_batch = np.zeros(batch_size, dtype=[
-                ('x', np.float32, (64, 64, 3)),
+            arr_len = batch_size
+            if idx + batch_size > len(data):
+                arr_len = len(data) - idx
+            transformed_batch = np.zeros(arr_len, dtype=[
+                ('x', np.float32, (32, 32, 3)),
                 ('y', np.int32, ())  # We will be using -1 for unlabeled
             ])
 
@@ -77,7 +80,7 @@ def eternal_batches_transform(data, transform, batch_size=100, random=np.random)
     assert batch_size > 0 and len(data) > 0
     for batch_idxs in eternal_random_index_batches(len(data), batch_size, random):
         transformed_batch = np.zeros(len(batch_idxs), dtype=[
-            ('x', np.float32, (64, 64, 3)),
+            ('x', np.float32, (32, 32, 3)),
             ('y', np.int32, ())  # We will be using -1 for unlabeled
         ])
 

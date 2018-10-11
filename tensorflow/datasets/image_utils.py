@@ -100,12 +100,12 @@ def img2array(img):
 train_pipeline = compose(load_image,
                          functools.partial(resize_aspect_random, min_px=72, max_px=128),
                          functools.partial(crop_rect, crop_size=(96, 48)),
-                         functools.partial(resize, min_px=64, max_px=64),
+                         functools.partial(resize, min_px=32, max_px=32),
                          get_color_jitter(0.8, 1.0),
                          img2array)
 
 eval_pipeline = compose(load_image,
                         functools.partial(resize, min_px=96, max_px=96),
                         functools.partial(crop_rect, crop_size=(96, 48)),
-                        functools.partial(resize, min_px=64, max_px=64),
+                        functools.partial(resize, min_px=32, max_px=32),
                         img2array)

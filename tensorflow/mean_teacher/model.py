@@ -225,7 +225,13 @@ class Model:
             self.train_init_op = tf.variables_initializer(train_init_variables)
 
         self.saver = tf.train.Saver()
-        self.session = tf.Session()
+
+        config = tf.ConfigProto()
+        config.gpu_options.per_process_gpu_memory_fraction = 0.6
+        config.gpu_options.allow_growth = True
+
+        self.session = tf.Session(config=config)
+
         self.run(self.init_init_op)
 
     def __setitem__(self, key, value):
@@ -384,7 +390,7 @@ def tower(inputs,
         slim.arg_scope(training_mode_funcs, **training_args):
             #pylint: disable=no-value-for-parameter
             net = inputs
-            assert_shape(net, [None, 64, 64, 3])
+            assert_shape(net, [None, 32, 32, 3])
 
             net = tf.cond(normalize_input,
                           lambda: slim.layer_norm(net,
@@ -392,7 +398,7 @@ def tower(inputs,
                                                   center=False,
                                                   scope='normalize_inputs'),
                           lambda: net)
-            assert_shape(net, [None, 64, 64, 3])
+            assert_shape(net, [None, 32, 32, 3])
 
             net = nn.flip_randomly(net,
                                    horizontally=flip_horizontally,
