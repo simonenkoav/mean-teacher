@@ -66,8 +66,7 @@ def run(test_phase, n_labeled, data_seed, model_type):
     tf.reset_default_graph()
     model = Model(RunContext(__file__, data_seed))
 
-    cifar = Cifar10ZCA(n_labeled=n_labeled,
-                       data_seed=data_seed,
+    cifar = Cifar10ZCA(data_seed=data_seed,
                        test_phase=test_phase)
 
     model['flip_horizontally'] = True

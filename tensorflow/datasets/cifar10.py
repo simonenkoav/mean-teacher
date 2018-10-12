@@ -89,11 +89,11 @@ class Eye24:
 
 
 class Eye24ZCA:
-    DATA_PATH = '/root/storage/hdd/playbooks/eyes_preprocessing_2/eye_data.nps'
+    DATA_PATH = '/root/storage/hdd/playbooks/eyes_preprocessing_2/eye_data.npz'
     VALIDATION_SET_SIZE = 4000  # 10% of the training set
     UNLABELED = -1
 
-    def __init__(self, data_seed=0, n_labeled='all', test_phase=False):
+    def __init__(self, data_seed=0, test_phase=False):
         random = np.random.RandomState(seed=data_seed)
         self._load()
 
@@ -101,9 +101,6 @@ class Eye24ZCA:
             self.evaluation, self.training = self._test_and_training()
         else:
             self.evaluation, self.training = self._validation_and_training(random)
-
-        if n_labeled != 'all':
-            self.training = self._unlabel(self.training, n_labeled, random)
 
     def _load(self):
         file_data = np.load(self.DATA_PATH)
@@ -124,9 +121,3 @@ class Eye24ZCA:
 
     def _test_and_training(self):
         return self._test_data, self._train_data
-
-    def _unlabel(self, data, n_labeled, random):
-        labeled, unlabeled = random_balanced_partitions(
-            data, n_labeled, labels=data['y'], random=random)
-        unlabeled['y'] = self.UNLABELED
-        return np.concatenate([labeled, unlabeled])
