@@ -13,7 +13,7 @@ import sys
 from experiments.run_context import RunContext
 import tensorflow as tf
 
-from datasets.cifar10 import Eye24
+from datasets.cifar10 import Eye24ZCA
 from mean_teacher.model import Model
 from mean_teacher import minibatching
 from datasets.image_utils import train_pipeline, eval_pipeline
@@ -23,11 +23,11 @@ LOG = logging.getLogger('main')
 
 
 def parameters():
-    # for model_type in ['mean_teacher', 'pi']:
+    test_phase = True
     for model_type in ['mean_teacher']:
         n_runs = 1
         for data_seed in range(2000, 2000 + n_runs):
-            yield {
+            yield {'test_phase': test_phase,
                 'model_type': model_type,
                 'data_seed': data_seed
             }
@@ -54,19 +54,21 @@ def model_hyperparameters(model_type, n_labeled, n_all):
         assert False, msg.format(locals())
 
 
-def run(data_seed, model_type):
+def run(test_phase, data_seed, model_type):
     minibatch_size = 80
     # fixed and pre-calculated (from file)
     n_labeled = 27360
-    n_all = 477360
+    n_all = 44458
     hyperparams = model_hyperparameters(model_type, n_labeled, n_all)
 
     tf.reset_default_graph()
     model = Model(RunContext(__file__, data_seed))
 
-    train_filename = '/root/storage/hdd/eyes_color/descriptions_files/labeled_unlabeled_vgg_35k.txt'
-    test_filename = '/root/storage/hdd/eyes_color/descriptions_files/test_base_path.txt'
-    eye_dataset = Eye24(imgs_dir='/root/storage/hdd/', train_filename=train_filename, test_filename=test_filename)
+    # train_filename = '/root/storage/hdd/eyes_color/descriptions_files/labeled_unlabeled_vgg_35k.txt'
+    # test_filename = '/root/storage/hdd/eyes_color/descriptions_files/test_base_path.txt'
+    eye_dataset = Eye24ZCA(n_labeled=n_labeled,
+                           data_seed=data_seed,
+                           test_phase=test_phase)
 
     model['flip_horizontally'] = True
     model['ema_consistency'] = hyperparams['ema_consistency']
@@ -78,9 +80,9 @@ def run(data_seed, model_type):
     model['rampdown_length'] = 25000
     model['training_length'] = 200000
 
-    training_batches = minibatching.training_batches_transform(eye_dataset.training, train_pipeline, minibatch_size)
-    evaluation_batches_fn = minibatching.evaluation_epoch_generator_transform(eye_dataset.evaluation, eval_pipeline,
-                                                                    minibatch_size)
+    training_batches = minibatching.training_batches(eye_dataset.training, minibatch_size,
+                                                     hyperparams['n_labeled_per_batch'])
+    evaluation_batches_fn = minibatching.evaluation_epoch_generator(eye_dataset.evaluation, minibatch_size)
 
     tensorboard_dir = model.save_tensorboard_graph()
     LOG.info("Saved tensorboard graph to %r", tensorboard_dir)
