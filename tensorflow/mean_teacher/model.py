@@ -76,7 +76,7 @@ class Model:
             self.tensorboard_path = os.path.join(run_context.result_dir, 'tensorboard')
 
         with tf.name_scope("placeholders"):
-            self.images = tf.placeholder(dtype=tf.float32, shape=(None, 64, 64, 3), name='images')
+            self.images = tf.placeholder(dtype=tf.float32, shape=(None, 32, 32, 3), name='images')
             self.labels = tf.placeholder(dtype=tf.int32, shape=(None,), name='labels')
             self.is_training = tf.placeholder(dtype=tf.bool, shape=(), name='is_training')
 
