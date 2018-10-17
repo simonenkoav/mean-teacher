@@ -64,23 +64,36 @@ class Eye24:
         self._load(train_filename, test_filename)
 
     def _load_data(self, filename):
-        x_data, y_data = [], []
+        x_data, y_data_24, y_data_3 = [], [], []
         max_str_len = 0
         for line in open(filename, 'r'):
             iname, label = line.rstrip('\n').split(' ')
             iname = self.imgs_dir + iname
             x_data.append(iname)
-            y_data.append(int(label))
+            y_data_24.append(int(label))
+
+            if label == -1:
+                label_3 = -1
+            else:
+                if label < 9:
+                    label_3 = 0
+                elif label < 15:
+                    label_3 = 1
+                else:
+                    label_3 = 2
+            y_data_3.append(int(label_3))
 
             if len(iname) > max_str_len:
                 max_str_len = len(iname)
 
         array = np.zeros(len(x_data), dtype=[
             ('x', np.str, max_str_len),
-            ('y', np.int32, ())  # We will be using -1 for unlabeled
+            ('y_24', np.int32, ()),  # We will be using -1 for unlabeled
+            ('y_3', np.int32, ())  # We will be using -1 for unlabeled
         ])
         array['x'] = x_data
-        array['y'] = y_data
+        array['y_24'] = y_data_24
+        array['y_3'] = y_data_3
         return array
 
     def _load(self, train_filename, test_filename):

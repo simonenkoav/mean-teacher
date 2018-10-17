@@ -79,6 +79,7 @@ class Model:
         with tf.name_scope("placeholders"):
             self.images = tf.placeholder(dtype=tf.float32, shape=(None, 32, 32, 3), name='images')
             self.labels = tf.placeholder(dtype=tf.int32, shape=(None,), name='labels')
+            self.labels_3 = tf.placeholder(dtype=tf.int32, shape=(None,), name='labels_3')
             self.is_training = tf.placeholder(dtype=tf.bool, shape=(), name='is_training')
 
         self.global_step = tf.Variable(0, trainable=False, name='global_step')
@@ -111,9 +112,9 @@ class Model:
                                     name='ema_decay')
 
         (
-            (self.class_logits_1, self.cons_logits_1),
-            (self.class_logits_2, self.cons_logits_2),
-            (self.class_logits_ema, self.cons_logits_ema)
+            (self.class_logits_1, self.cons_logits_1, self.class_logits_1_3, self.cons_logits_1_3),
+            (self.class_logits_2, self.cons_logits_2, self.class_logits_2_3, self.cons_logits_2_3),
+            (self.class_logits_ema, self.cons_logits_ema, self.class_logits_ema_3, self.cons_logits_ema_3)
         ) = inference(
             self.images,
             is_training=self.is_training,
@@ -127,20 +128,24 @@ class Model:
             num_logits=self.hyper['num_logits'])
 
         with tf.name_scope("objectives"):
-            self.mean_error_1, self.errors_1, self.top5_1 = errors(self.class_logits_1, self.labels)
-            self.mean_error_ema, self.errors_ema, self.top5_ema = errors(self.class_logits_ema, self.labels)
+            self.mean_error_1, self.errors_1, self.mean_error_1_3, self.errors_1_3, self.top5_1 = \
+                errors(self.class_logits_1, self.labels, self.class_logits_1_3, self.labels_3)
+            self.mean_error_ema, self.errors_ema, self.mean_error_ema_3, self.errors_ema_3, self.top5_ema = \
+                errors(self.class_logits_ema, self.labels, self.class_logits_ema_3, self.labels_3)
 
-            self.mean_class_cost_1, self.class_costs_1 = classification_costs(
-                self.class_logits_1, self.labels)
-            self.mean_class_cost_ema, self.class_costs_ema = classification_costs(
-                self.class_logits_ema, self.labels)
+            self.mean_class_cost_1, self.class_costs_1, self.mean_class_cost_1_3, self.class_costs_1_3 = \
+                classification_costs(self.class_logits_1, self.labels, self.class_logits_1_3, self.labels_3)
+            self.mean_class_cost_ema, self.class_costs_ema, self.mean_class_cost_ema_3, self.class_costs_ema_3 = \
+                classification_costs(self.class_logits_ema, self.labels, self.class_logits_ema_3, self.labels_3)
 
             labeled_consistency = self.hyper['apply_consistency_to_labeled']
             consistency_mask = tf.logical_or(tf.equal(self.labels, -1), labeled_consistency)
-            self.mean_cons_cost_pi, self.cons_costs_pi = consistency_costs(
-                self.cons_logits_1, self.class_logits_2, self.cons_coefficient, consistency_mask, self.hyper['consistency_trust'])
-            self.mean_cons_cost_mt, self.cons_costs_mt = consistency_costs(
-                self.cons_logits_1, self.class_logits_ema, self.cons_coefficient, consistency_mask, self.hyper['consistency_trust'])
+            self.mean_cons_cost_pi, self.cons_costs_pi, self.mean_cons_cost_pi_3, self.cons_costs_pi_3 = \
+                consistency_costs(self.cons_logits_1, self.class_logits_2, self.cons_logits_1_3, self.class_logits_2_3,
+                                  self.cons_coefficient, consistency_mask, self.hyper['consistency_trust'])
+            self.mean_cons_cost_mt, self.cons_costs_mt, self.mean_cons_cost_mt_3, self.cons_costs_mt_3 = \
+                consistency_costs(self.cons_logits_1, self.class_logits_ema, self.cons_logits_1_3, self.class_logits_ema_3,
+                                  self.cons_coefficient, consistency_mask, self.hyper['consistency_trust'])
 
 
             def l2_norms(matrix):
@@ -149,22 +154,44 @@ class Model:
                 return mean_l2, l2s
 
             self.mean_res_l2_1, self.res_l2s_1 = l2_norms(self.class_logits_1 - self.cons_logits_1)
+            self.mean_res_l2_1_3, self.res_l2s_1_3 = l2_norms(self.class_logits_1_3 - self.cons_logits_1_3)
+
             self.mean_res_l2_ema, self.res_l2s_ema = l2_norms(self.class_logits_ema - self.cons_logits_ema)
+            self.mean_res_l2_ema_3, self.res_l2s_ema_3 = l2_norms(self.class_logits_ema_3 - self.cons_logits_ema_3)
+
             self.res_costs_1 = self.hyper['logit_distance_cost'] * self.res_l2s_1
+            self.res_costs_1_3 = self.hyper['logit_distance_cost'] * self.res_l2s_1_3
+
             self.mean_res_cost_1 = tf.reduce_mean(self.res_costs_1)
+            self.mean_res_cost_1_3 = tf.reduce_mean(self.res_costs_1_3)
+
             self.res_costs_ema = self.hyper['logit_distance_cost'] * self.res_l2s_ema
+            self.res_costs_ema_3 = self.hyper['logit_distance_cost'] * self.res_l2s_ema_3
+
             self.mean_res_cost_ema = tf.reduce_mean(self.res_costs_ema)
+            self.mean_res_cost_ema_3 = tf.reduce_mean(self.res_costs_ema_3)
 
             self.mean_total_cost_pi, self.total_costs_pi = total_costs(
                 self.class_costs_1, self.cons_costs_pi, self.res_costs_1)
+            self.mean_total_cost_pi_3, self.total_costs_pi_3 = total_costs(
+                self.class_costs_1_3, self.cons_costs_pi_3, self.res_costs_1_3)
+
             self.mean_total_cost_mt, self.total_costs_mt = total_costs(
                 self.class_costs_1, self.cons_costs_mt, self.res_costs_1)
+            self.mean_total_cost_mt_3, self.total_costs_mt_3 = total_costs(
+                self.class_costs_1_3, self.cons_costs_mt_3, self.res_costs_1_3)
+
             assert_shape(self.total_costs_pi, [3])
             assert_shape(self.total_costs_mt, [3])
 
             self.cost_to_be_minimized = tf.cond(self.hyper['ema_consistency'],
                                                 lambda: self.mean_total_cost_mt,
                                                 lambda: self.mean_total_cost_pi)
+            self.cost_to_be_minimized_3 = tf.cond(self.hyper['ema_consistency'],
+                                                lambda: self.mean_total_cost_mt_3,
+                                                lambda: self.mean_total_cost_pi_3)
+
+            self.cost_to_be_minimized = self.cost_to_be_minimized * 0.1 + self.cost_to_be_minimized_3
 
         with tf.name_scope("train_step"):
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -188,35 +215,53 @@ class Model:
             "ema_decay": self.ema_decay,
             "cons_coefficient": self.cons_coefficient,
             "train/error/1": self.mean_error_1,
+            "train/error_3/1": self.mean_error_1_3,
             "train/error/ema": self.mean_error_ema,
+            "train/error_3/ema": self.mean_error_ema_3,
             "train/class_cost/1": self.mean_class_cost_1,
+            "train/class_cost_3/1": self.mean_class_cost_1_3,
             "train/class_cost/ema": self.mean_class_cost_ema,
+            "train/class_cost_3/ema": self.mean_class_cost_ema_3,
             "train/cons_cost/pi": self.mean_cons_cost_pi,
+            "train/cons_cost_3/pi": self.mean_cons_cost_pi_3,
             "train/cons_cost/mt": self.mean_cons_cost_mt,
+            "train/cons_cost_3/mt": self.mean_cons_cost_mt_3,
             "train/res_cost/1": self.mean_res_cost_1,
+            "train/res_cost_3/1": self.mean_res_cost_1_3,
             "train/res_cost/ema": self.mean_res_cost_ema,
+            "train/res_cost_3/ema": self.mean_res_cost_ema_3,
             "train/total_cost/pi": self.mean_total_cost_pi,
+            "train/total_cost_3/pi": self.mean_total_cost_pi_3,
             "train/total_cost/mt": self.mean_total_cost_mt,
+            "train/total_cost_3/mt": self.mean_total_cost_mt_3,
         }
 
         with tf.variable_scope("validation_metrics") as metrics_scope:
             self.metric_values, self.metric_update_ops = metrics.aggregate_metric_map({
                 "eval/error/1": streaming_mean(self.errors_1),
+                "eval/error_3/1": streaming_mean(self.errors_1_3),
                 "eval/top5/1": streaming_mean(self.top5_1),
                 "eval/error/ema": streaming_mean(self.errors_ema),
+                "eval/error_3/ema": streaming_mean(self.errors_ema_3),
                 "eval/class_cost/1": streaming_mean(self.class_costs_1),
+                "eval/class_cost_3/1": streaming_mean(self.class_costs_1_3),
                 "eval/class_cost/ema": streaming_mean(self.class_costs_ema),
+                "eval/class_cost_3/ema": streaming_mean(self.class_costs_ema_3),
                 "eval/res_cost/1": streaming_mean(self.res_costs_1),
+                "eval/res_cost_3/1": streaming_mean(self.res_costs_1_3),
                 "eval/res_cost/ema": streaming_mean(self.res_costs_ema),
+                "eval/res_cost_3/ema": streaming_mean(self.res_costs_ema_3),
             })
             metric_variables = slim.get_local_variables(scope=metrics_scope.name)
             self.metric_init_op = tf.variables_initializer(metric_variables)
 
         self.result_formatter = string_utils.DictFormatter(
-            order=["eval/error/ema", "error/1", "class_cost/1",  "top5/1", "cons_cost/mt"],
+            order=["eval/error/ema", "eval/error_3/ema", "error/1", "error_3/1", "class_cost/1", "class_cost_3/1",
+                   "cons_cost/mt", "cons_cost_3/mt", "top5/1"],
             default_format='{name}: {value:>10.6f}',
             separator=",  ")
         self.result_formatter.add_format('error', '{name}: {value:>6.1%}')
+        self.result_formatter.add_format('error_3', '{name}: {value:>6.1%}')
         self.result_formatter.add_format('top5', '{name}: {value:>6.1%}')
 
         with tf.name_scope("initializers"):
@@ -227,7 +272,7 @@ class Model:
             self.init_init_op = tf.variables_initializer(init_init_variables)
             self.train_init_op = tf.variables_initializer(train_init_variables)
 
-        self.saver = tf.train.Saver()
+        self.saver = tf.train.Saver(max_to_keep=0)
 
         config = tf.ConfigProto()
         config.gpu_options.per_process_gpu_memory_fraction = 0.6
@@ -282,7 +327,8 @@ class Model:
     def feed_dict(self, batch, is_training=True):
         return {
             self.images: batch['x'],
-            self.labels: batch['y'],
+            self.labels: batch['y_24'],
+            self.labels_3: batch['y_3'],
             self.is_training: is_training
         }
 
@@ -354,13 +400,20 @@ def inference(inputs, is_training, ema_decay, input_noise, student_dropout_proba
     with tf.variable_scope("initialization") as var_scope:
         _ = tower(**tower_args, dropout_probability=student_dropout_probability, is_initialization=True)
     with name_variable_scope("primary", var_scope, reuse=True) as (name_scope, _):
-        class_logits_1, cons_logits_1 = tower(**tower_args, dropout_probability=student_dropout_probability, name=name_scope)
+        class_logits_1, cons_logits_1, class_logits_1_3, cons_logits_1_3 = \
+            tower(**tower_args, dropout_probability=student_dropout_probability, name=name_scope)
     with name_variable_scope("secondary", var_scope, reuse=True) as (name_scope, _):
-        class_logits_2, cons_logits_2 = tower(**tower_args, dropout_probability=teacher_dropout_probability, name=name_scope)
+        class_logits_2, cons_logits_2,class_logits_2_3, cons_logits_2_3 = \
+            tower(**tower_args, dropout_probability=teacher_dropout_probability, name=name_scope)
     with ema_variable_scope("ema", var_scope, decay=ema_decay):
-        class_logits_ema, cons_logits_ema = tower(**tower_args, dropout_probability=teacher_dropout_probability, name=name_scope)
-        class_logits_ema, cons_logits_ema = tf.stop_gradient(class_logits_ema), tf.stop_gradient(cons_logits_ema)
-    return (class_logits_1, cons_logits_1), (class_logits_2, cons_logits_2), (class_logits_ema, cons_logits_ema)
+        class_logits_ema, cons_logits_ema, class_logits_ema_3, cons_logits_ema_3 = \
+            tower(**tower_args, dropout_probability=teacher_dropout_probability, name=name_scope)
+        class_logits_ema, cons_logits_ema, class_logits_ema_3, cons_logits_ema_3 = \
+            tf.stop_gradient(class_logits_ema), tf.stop_gradient(cons_logits_ema), \
+            tf.stop_gradient(class_logits_ema_3), tf.stop_gradient(cons_logits_ema_3)
+    return (class_logits_1, cons_logits_1, class_logits_1_3, cons_logits_1_3), \
+           (class_logits_2, cons_logits_2, class_logits_2_3, cons_logits_2_3), \
+           (class_logits_ema, cons_logits_ema, class_logits_ema_3, cons_logits_ema_3)
 
 
 def tower(inputs,
@@ -439,19 +492,26 @@ def tower(inputs,
             primary_logits = wn.fully_connected(net, 24, init=is_initialization)
             secondary_logits = wn.fully_connected(net, 24, init=is_initialization)
 
+            primary_logits_3 = wn.fully_connected(net, 3, init=is_initialization)
+            secondary_logits_3 = wn.fully_connected(net, 3, init=is_initialization)
+
             with tf.control_dependencies([tf.assert_greater_equal(num_logits, 1),
                                           tf.assert_less_equal(num_logits, 2)]):
                 secondary_logits = tf.case([
                     (tf.equal(num_logits, 1), lambda: primary_logits),
                     (tf.equal(num_logits, 2), lambda: secondary_logits),
                 ], exclusive=True, default=lambda: primary_logits)
+                secondary_logits_3 = tf.case([
+                    (tf.equal(num_logits, 1), lambda: primary_logits_3),
+                    (tf.equal(num_logits, 2), lambda: secondary_logits_3),
+                ], exclusive=True, default=lambda: primary_logits_3)
 
             assert_shape(primary_logits, [None, 24])
             assert_shape(secondary_logits, [None, 24])
-            return primary_logits, secondary_logits
+            return primary_logits, secondary_logits, primary_logits_3, secondary_logits_3
 
 
-def errors(logits, labels, name=None):
+def errors(logits, labels, logits_3, labels_3, name=None):
     """Compute error mean and whether each unlabeled example is erroneous
 
     Assume unlabeled examples have label == -1.
@@ -476,10 +536,14 @@ def errors(logits, labels, name=None):
 
         top5 = top_k_accuracy(labels=labels, logits=logits, k=5)
 
-        return mean, per_sample, top5
+        # TODO
+        mean_3 = mean
+        per_sample_3 = per_sample
+
+        return mean, per_sample, mean_3, per_sample_3, top5
 
 
-def classification_costs(logits, labels, name=None):
+def classification_costs(logits, labels, logits_3, labels_3, name=None):
     """Compute classification cost mean and classification cost per sample
 
     Assume unlabeled examples have label == -1. For unlabeled examples, cost == 0.
@@ -503,10 +567,14 @@ def classification_costs(logits, labels, name=None):
         total_count = tf.to_float(tf.shape(per_sample)[0])
         mean = tf.div(labeled_sum, total_count, name=scope)
 
-        return mean, per_sample
+        # TODO
+        mean_3 = mean
+        per_sample_3 = per_sample
+
+        return mean, per_sample, mean_3, per_sample_3
 
 
-def consistency_costs(logits1, logits2, cons_coefficient, mask, consistency_trust, name=None):
+def consistency_costs(logits1, logits2, logits1_3, logits2_3, num_classes, cons_coefficient, mask, consistency_trust, name=None):
     """Takes a softmax of the logits and returns their distance as described below
 
     Consistency_trust determines the distance metric to use
@@ -530,7 +598,8 @@ def consistency_costs(logits1, logits2, cons_coefficient, mask, consistency_trus
     """
 
     with tf.name_scope(name, "consistency_costs") as scope:
-        num_classes = 24
+        # num_classes_1 = 24
+        # num_classes_2 = 3
         assert_shape(logits1, [None, num_classes])
         assert_shape(logits2, [None, num_classes])
         assert_shape(cons_coefficient, [])
@@ -569,7 +638,11 @@ def consistency_costs(logits1, logits2, cons_coefficient, mask, consistency_trus
         mean_cost = tf.reduce_mean(costs, name=scope)
         assert_shape(costs, [None])
         assert_shape(mean_cost, [])
-        return mean_cost, costs
+
+        # TODO
+        mean_cost_3 = mean_cost
+        costs_3 = costs
+        return mean_cost, costs, mean_cost_3, costs_3
 
 
 def total_costs(*all_costs, name=None):
