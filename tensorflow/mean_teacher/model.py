@@ -19,6 +19,7 @@ from . import nn
 from . import weight_norm as wn
 from .framework import ema_variable_scope, name_variable_scope, assert_shape, HyperparamVariables
 from . import string_utils
+import sys
 
 
 LOG = logging.getLogger('main')
@@ -126,8 +127,8 @@ class Model:
             num_logits=self.hyper['num_logits'])
 
         with tf.name_scope("objectives"):
-            self.mean_error_1, self.errors_1 = errors(self.class_logits_1, self.labels)
-            self.mean_error_ema, self.errors_ema = errors(self.class_logits_ema, self.labels)
+            self.mean_error_1, self.errors_1, self.top5_1 = errors(self.class_logits_1, self.labels)
+            self.mean_error_ema, self.errors_ema, self.top5_ema = errors(self.class_logits_ema, self.labels)
 
             self.mean_class_cost_1, self.class_costs_1 = classification_costs(
                 self.class_logits_1, self.labels)
@@ -201,6 +202,7 @@ class Model:
         with tf.variable_scope("validation_metrics") as metrics_scope:
             self.metric_values, self.metric_update_ops = metrics.aggregate_metric_map({
                 "eval/error/1": streaming_mean(self.errors_1),
+                "eval/top5/1": streaming_mean(self.top5_1),
                 "eval/error/ema": streaming_mean(self.errors_ema),
                 "eval/class_cost/1": streaming_mean(self.class_costs_1),
                 "eval/class_cost/ema": streaming_mean(self.class_costs_ema),
@@ -211,10 +213,11 @@ class Model:
             self.metric_init_op = tf.variables_initializer(metric_variables)
 
         self.result_formatter = string_utils.DictFormatter(
-            order=["eval/error/ema", "error/1", "class_cost/1", "cons_cost/mt"],
+            order=["eval/error/ema", "error/1", "class_cost/1",  "top5/1", "cons_cost/mt"],
             default_format='{name}: {value:>10.6f}',
             separator=",  ")
         self.result_formatter.add_format('error', '{name}: {value:>6.1%}')
+        self.result_formatter.add_format('top5', '{name}: {value:>6.1%}')
 
         with tf.name_scope("initializers"):
             init_init_variables = tf.get_collection("init_in_init")
@@ -463,8 +466,17 @@ def errors(logits, labels, name=None):
         predictions = tf.argmax(logits, -1)
         labels = tf.cast(labels, tf.int64)
         per_sample = tf.to_float(tf.not_equal(predictions, labels))
+
+        def top_k_accuracy(labels, logits, k=5):
+            topk = tf.nn.in_top_k(predictions=logits, targets=labels, k=k)
+            topk = tf.to_float(topk)
+            return topk
+
         mean = tf.reduce_mean(per_sample, name=scope)
-        return mean, per_sample
+
+        top5 = top_k_accuracy(labels=labels, logits=logits, k=5)
+
+        return mean, per_sample, top5
 
 
 def classification_costs(logits, labels, name=None):
