@@ -21,6 +21,7 @@ from .framework import ema_variable_scope, name_variable_scope, assert_shape, Hy
 from . import string_utils
 import sys
 
+import functools
 
 LOG = logging.getLogger('main')
 
@@ -536,9 +537,14 @@ def errors(logits, labels, logits_3, labels_3, name=None):
 
         top5 = top_k_accuracy(labels=labels, logits=logits, k=5)
 
-        # TODO
-        mean_3 = mean
-        per_sample_3 = per_sample
+        # For 3 classes
+        labels_3 = tf.boolean_mask(labels_3, applicable)
+        logits_3 = tf.boolean_mask(logits_3, applicable)
+        predictions_3 = tf.argmax(logits_3, -1)
+        labels_3 = tf.cast(labels_3, tf.int64)
+        per_sample_3 = tf.to_float(tf.not_equal(predictions_3, labels_3))
+
+        mean_3 = tf.reduce_mean(per_sample_3, name=scope)
 
         return mean, per_sample, mean_3, per_sample_3, top5
 
@@ -567,9 +573,15 @@ def classification_costs(logits, labels, logits_3, labels_3, name=None):
         total_count = tf.to_float(tf.shape(per_sample)[0])
         mean = tf.div(labeled_sum, total_count, name=scope)
 
-        # TODO
-        mean_3 = mean
-        per_sample_3 = per_sample
+        # For 3 classes
+        labels_3 = tf.where(applicable, labels_3, tf.zeros_like(labels_3))
+
+        per_sample_3 = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits_3, labels=labels_3)
+        per_sample_3 = tf.where(applicable, per_sample_3, tf.zeros_like(per_sample_3))
+
+        labeled_sum_3 = tf.reduce_sum(per_sample_3)
+        total_count_3 = tf.to_float(tf.shape(per_sample_3)[0])
+        mean_3 = tf.div(labeled_sum_3, total_count_3, name=scope)
 
         return mean, per_sample, mean_3, per_sample_3
 
@@ -606,42 +618,59 @@ def consistency_costs(logits1, logits2, logits1_3, logits2_3, num_classes, cons_
         softmax1 = tf.nn.softmax(logits1)
         softmax2 = tf.nn.softmax(logits2)
 
+        softmax1_3 = tf.nn.softmax(logits1_3)
+        softmax2_3 = tf.nn.softmax(logits2_3)
+
         kl_cost_multiplier = 2 * (1 - 1/num_classes) / num_classes**2 / consistency_trust**2
 
-        def pure_mse():
-            costs = tf.reduce_mean((softmax1 - softmax2) ** 2, -1)
+        num_classes_3 = 3
+        kl_cost_multiplier_3 = 2 * (1 - 1 / num_classes_3) / num_classes _3** 2 / consistency_trust ** 2
+
+        def pure_mse(softmax1_, softmax2_):
+            costs = tf.reduce_mean((softmax1_ - softmax2_) ** 2, -1)
             return costs
 
-        def pure_kl():
-            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits1, labels=softmax2)
-            entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits2, labels=softmax2)
+        def pure_kl(logits1_, logits2_, softmax2_):
+            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits1_, labels=softmax2_)
+            entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits2_, labels=softmax2_)
             costs = cross_entropy - entropy
             costs = costs * kl_cost_multiplier
             return costs
 
-        def mixture_kl():
+        def mixture_kl(softmax1_, softmax2_, num_classes_):
             with tf.control_dependencies([tf.assert_greater(consistency_trust, 0.0),
                                           tf.assert_less(consistency_trust, 1.0)]):
-                uniform = tf.constant(1 / num_classes, shape=[num_classes])
-                mixed_softmax1 = consistency_trust * softmax1 + (1 - consistency_trust) * uniform
-                mixed_softmax2 = consistency_trust * softmax2 + (1 - consistency_trust) * uniform
+                uniform = tf.constant(1 / num_classes_, shape=[num_classes_])
+                mixed_softmax1 = consistency_trust * softmax1_ + (1 - consistency_trust) * uniform
+                mixed_softmax2 = consistency_trust * softmax2_ + (1 - consistency_trust) * uniform
                 costs = tf.reduce_sum(mixed_softmax2 * tf.log(mixed_softmax2 / mixed_softmax1), axis=1)
                 costs = costs * kl_cost_multiplier
                 return costs
 
         costs = tf.case([
-            (tf.equal(consistency_trust, 0.0), pure_mse),
-            (tf.equal(consistency_trust, 1.0), pure_kl)
-        ], default=mixture_kl)
+            (tf.equal(consistency_trust, 0.0), functools.partial(pure_mse, softmax1_=softmax1, softmax2_=softmax2)),
+            (tf.equal(consistency_trust, 1.0), functools.partial(pure_kl,
+                                                                 logits1_=logits1, logits2_=logits2, softmax2_=softmax2))
+        ], default=functools.partial(mixture_kl, softmax1_=softmax1, softmax2_=softmax2, num_classes_=num_classes))
 
         costs = costs * tf.to_float(mask) * cons_coefficient
         mean_cost = tf.reduce_mean(costs, name=scope)
         assert_shape(costs, [None])
         assert_shape(mean_cost, [])
 
-        # TODO
-        mean_cost_3 = mean_cost
-        costs_3 = costs
+        # For 3 classes
+        costs_3 = tf.case([
+            (tf.equal(consistency_trust, 0.0), functools.partial(pure_mse, softmax1_=softmax1_3, softmax2_=softmax2_3)),
+            (tf.equal(consistency_trust, 1.0), functools.partial(pure_kl,
+                                                                 logits1_=logits1_3, logits2_=logits2_3,
+                                                                 softmax2_=softmax2_3))
+        ], default=functools.partial(mixture_kl, softmax1_=softmax1_3, softmax2_=softmax2_3, num_classes_=num_classes_3))
+
+        costs_3 = costs_3 * tf.to_float(mask) * cons_coefficient
+        mean_cost_3 = tf.reduce_mean(costs_3, name=scope)
+        assert_shape(costs_3, [None])
+        assert_shape(mean_cost_3, [])
+
         return mean_cost, costs, mean_cost_3, costs_3
 
 
