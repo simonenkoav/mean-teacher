@@ -29,18 +29,21 @@ def evaluation_epoch_generator_transform(data, transform, batch_size=100):
                 arr_len = len(data) - idx
             transformed_batch = np.zeros(arr_len, dtype=[
                 ('x', np.float32, (32, 32, 3)),
-                ('y', np.int32, ())  # We will be using -1 for unlabeled
+                ('y_24', np.int32, ()),  # We will be using -1 for unlabeled
+                ('y_3', np.int32, ())
             ])
 
-            x_data, y_data = [], []
+            x_data, y_data_24, y_data_3 = [], [], []
             for d in data[idx:(idx + batch_size)]:
-                iname, label = d
+                iname, label_24, label_3 = d
                 image = transform(iname)
                 x_data.append(image)
-                y_data.append(label)
+                y_data_24.append(label_24)
+                y_data_3.append(label_3)
 
             transformed_batch['x'] = x_data
-            transformed_batch['y'] = y_data
+            transformed_batch['y_24'] = y_data_24
+            transformed_batch['y_3'] = y_data_3
             yield transformed_batch
     return generate
 
@@ -81,18 +84,21 @@ def eternal_batches_transform(data, transform, batch_size=100, random=np.random)
     for batch_idxs in eternal_random_index_batches(len(data), batch_size, random):
         transformed_batch = np.zeros(len(batch_idxs), dtype=[
             ('x', np.float32, (32, 32, 3)),
-            ('y', np.int32, ())  # We will be using -1 for unlabeled
+            ('y_24', np.int32, ()),  # We will be using -1 for unlabeled
+            ('y_3', np.int32, ())
         ])
 
-        x_data, y_data = [], []
+        x_data, y_data_24, y_data_3 = [], [], []
         for d in data[batch_idxs]:
-            iname, label = d
+            iname, label_24, label_3 = d
             image = transform(iname)
             x_data.append(image)
-            y_data.append(label)
+            y_data_24.append(label_24)
+            y_data_3.append(label_3)
 
         transformed_batch['x'] = x_data
-        transformed_batch['y'] = y_data
+        transformed_batch['y_24'] = y_data_24
+        transformed_batch['y_3'] = y_data_3
 
         yield transformed_batch
 

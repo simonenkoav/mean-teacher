@@ -66,11 +66,19 @@ class Eye24:
     def _load_data(self, filename):
         x_data, y_data_24, y_data_3 = [], [], []
         max_str_len = 0
+
+        inames, labels = [], []
         for line in open(filename, 'r'):
             iname, label = line.rstrip('\n').split(' ')
+            inames.append(iname)
+            labels.append(label)
+
+        for i in range(len(inames)):
+            iname, label = inames[i], labels[i]
+            label = int(label)
             iname = self.imgs_dir + iname
             x_data.append(iname)
-            y_data_24.append(int(label))
+            y_data_24.append(label)
 
             if label == -1:
                 label_3 = -1

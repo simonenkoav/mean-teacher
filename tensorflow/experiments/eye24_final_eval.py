@@ -58,7 +58,7 @@ def run(test_phase, data_seed, model_type):
     minibatch_size = 100
     # fixed and pre-calculated (from file)
     n_labeled = 127737
-    n_all = 631472+127737
+    n_all = 630346+127737
     hyperparams = model_hyperparameters(model_type, n_labeled, n_all)
 
     tf.reset_default_graph()
